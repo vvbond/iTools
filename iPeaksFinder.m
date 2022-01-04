@@ -31,6 +31,14 @@ classdef iPeaksFinder < iTool
                                     'MinPeakProminence', pkf.minprominence);
             pkf.peaks = struct('value', pks, 'location', locs, 'width', wdth, 'prominence', prom);
         end
+
+        function delete_peak(pkf, ix)
+            pkf.peaks.location(ix) = [];
+            pkf.peaks.width(ix) = [];
+            pkf.peaks.prominence(ix) = [];
+            pkf.peaks.value(ix) = [];
+        end
+
         %% Plot
         function init_plot(pkf)
             pkf.handles.hfig = figure;
@@ -52,6 +60,7 @@ classdef iPeaksFinder < iTool
             box on, grid on;
 
             % Interactivity:
+            pkf.handles.peaksplot.ButtonDownFcn = @(src,evt) pkf.peak_bdcb(src,evt);
             pkf.handles.height_line = iyline(pkf.handles.hax, pkf.minheight);
             pkf.handles.prominence_line = iyline(pkf.handles.hax_prom, pkf.minprominence, 'LineWidth', 3);
             addlistener(pkf.handles.height_line, 'positionChanged', @(src,evt) pkf.set('minheight', pkf.handles.height_line.Value));
@@ -61,9 +70,20 @@ classdef iPeaksFinder < iTool
             iAxes.set_keyboard_shortcuts(pkf.handles.hfig);
         end
 
-        function update(pkf)
-            pkf.find_peaks();
+        function update(pkf, recompute)
+            if nargin == 1, recompute = true; end
+            if recompute, pkf.find_peaks(); end
             set(pkf.handles.peaksplot, 'XData', pkf.peaks.location, 'YData', pkf.peaks.value);
+        end
+    end
+    methods
+        function peak_bdcb(pkf, ~, evt)
+            if evt.Button ~= 3, return; end
+            p = evt.IntersectionPoint;
+            location_num = ruler2num(pkf.peaks.location, pkf.handles.hax.XAxis);
+            ix = find(abs(location_num - p(1)) < 1e-8);
+            pkf.delete_peak(ix);
+            pkf.update(false);
         end
     end
     events
