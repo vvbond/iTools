@@ -173,7 +173,7 @@ classdef iRoI1d < iTool
         %% ROI update
         function update(r)
             set(r.handles.rect, 'XData', r.vertices(:,1), 'YData', r.vertices(:,2));
-            set(r.handles.infotext, 'Position', r.vertices([2,7]), 'String', r.displayFcn(r));
+            set(r.handles.infotext, 'Position', r.vertices([2,6]), 'String', r.displayFcn(r));
             if r.flags.roiPlotOn
                 r.plot_data();
             end
@@ -182,12 +182,7 @@ classdef iRoI1d < iTool
         
         %% Annotation
         function display_info(r)
-            r.handles.infotext = text(r.vertices(2,1), r.vertices(3,2), r.displayFcn(r), 'FontSize', 16);
-        end
-
-        function s = infoString(r)
-            s = datestr(r.width, 'HH:MM:SS');
-%             s = ['ROI: [' num2str(r.rng', '%5.2f ') ']' ];
+            r.handles.infotext = text(r.vertices(2,1), r.vertices(2,2), r.displayFcn(r), 'FontSize', 16);
         end
     end
 
