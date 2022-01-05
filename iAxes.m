@@ -50,7 +50,6 @@ classdef iAxes
             hax.XAxis.Limits = hplot.XData(end) - [diff(hax.XAxis.Limits), 0];
         end
 
-
         function set_keyboard_shortcuts(hfig)
             if nargin == 0, hfig = gcf; end
             set(hfig, 'KeyPressFcn', @(src, evt) keypressfcn(src,evt,{'j', [], @()iAxes.set_xlim_resized(gca, .9);
@@ -66,10 +65,16 @@ classdef iAxes
                                                                       'a', 'control', @()axis(gca, 'tight');
                                                                       'home', [], @()iAxes.set_xlim_start(gca);
                                                                       'end',  [], @()iAxes.set_xlim_end(gca);
+                                                                      'h', 'shift', @()iAxes.set_xlim_start(gca);
+                                                                      'l', 'shift', @()iAxes.set_xlim_end(gca);
                                                                       'x', [], @()set(gca, 'Interactions', zoomInteraction('Dimensions', 'x'));
                                                                       'y', [], @()set(gca, 'Interactions', zoomInteraction('Dimensions', 'y'))
                                                                       }));
 
+        end
+
+        function set_interactions(hax)
+            hax.Interactions = [zoomInteraction('Dimensions', 'x'), panInteraction('Dimensions', 'x')];
         end
     end
 end
