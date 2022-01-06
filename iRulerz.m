@@ -1,8 +1,10 @@
 classdef iRulerz < iTool
 %% Interactive tool for measuring distances along x- and/or y-axes.
-    properties(SetObservable)
+    properties(Dependent)
         xx      % 2-vector of x-coordinates for the two vertical lines.
         yy      % 2-vector of y-coordinates for the two horizontal lines. 
+        xx_num
+        yy_num
     end
     properties
         axis        % 'x' (or 1) for x-lines only;
@@ -20,7 +22,6 @@ classdef iRulerz < iTool
         clickPoint
         lineIx      % index of the "clikcked" (selected) line.
         hBtn        % handle of the toggle button.
-        hlines      % handles of the ruler lines.
         hInfoBox    % handle of the annotation text box.
     end
     
@@ -74,8 +75,6 @@ classdef iRulerz < iTool
 
             % Add listeners:
             addlistener(rlz, 'axisChange', @(src, evt) axisChangeEvt(rlz,src,evt));
-            addlistener(rlz, 'xx', 'PostSet', @(src, evt) xx_PostSet_cb(rlz,src,evt));
-            addlistener(rlz, 'yy', 'PostSet', @(src, evt) yy_PostSet_cb(rlz,src,evt));
         end
         
         %% Destructor
@@ -87,12 +86,28 @@ classdef iRulerz < iTool
         end
     end
     
-%% Setter methods
+%% Setter & Getters
     methods 
         function set.axis(rlz, val)
         % Monitor the axis change and set the appropriate icon to the toolbar.
             rlz.axis = val;
             notify(rlz, 'axisChange');
+        end
+        
+        function val = get.xx_num(rlz)
+            val = [rlz.handles.xlines(end:-1:1).Value];
+        end
+
+        function val = get.xx(rlz)
+            val = num2ruler(rlz.xx_num, rlz.handles.hax.XAxis);
+        end
+
+        function val = get.yy_num(rlz)
+            val = [rlz.handles.ylines(end:-1:1).Value];
+        end
+
+        function val = get.yy(rlz)
+            val = num2ruler(rlz.yy_num, rlz.handles.hax.YAxis);
         end
     end
 %% Hidden methods handling user interactions
@@ -102,79 +117,69 @@ classdef iRulerz < iTool
         % Display ruler lines.
             
             rlz.handles.hax = gca;
-            % Define x- and y- coordinates of the ruler lines:            
-            xlims = get(rlz.handles.hax,'xlim')';
-            ylims = get(rlz.handles.hax,'ylim')';
-
-            dx = diff(xlims);
-            dy = diff(ylims);
-            if isempty(rlz.xx) || any(~within(rlz.xx, xlims))
-                rlz.xx = xlims(1)+[1 2]./3*dx;
-            end
-            if isempty(rlz.yy) || any(~within(rlz.yy, ylims))
-                rlz.yy = ylims(1)+[1 2]./3*dy; % lines position [x1 x2 y1 y2].
-            end
-            
             % Plot lines:
-            hold on;
-            switch rlz.axis
-                case {1, 'x'}
-                    rlz.hlines = [ixline(rlz.xx(1)); ixline(rlz.xx(2))];
-                case {2, 'y'}
-                    rlz.hlines = [iyline(rlz.yy(1)); iyline(rlz.yy(2))];
-                otherwise
-                    rlz.hlines = [iAxisLine(rlz.xx(1)) iAxisLine(rlz.yy(1),2)
-                                  iAxisLine(rlz.xx(2)) iAxisLine(rlz.yy(2),2) ];
+            H = 0;
+            if ~isempty(intersect('x', rlz.axis))
+                rlz.handles.xlines = [ixline(rlz.handles.hax, []); ixline(rlz.handles.hax, [])];
+                addlistener(rlz.handles.xlines, 'positionChanged', @(src,evt) rlz.update_info());
+                H = H + 40;
             end
-            xlim(xlims);
-            ylim(ylims);
+            if ~isempty(intersect('y', rlz.axis))
+                rlz.handles.ylines = [iyline(rlz.handles.hax, []); iyline(rlz.handles.hax, [])];
+                addlistener(rlz.handles.ylines, 'positionChanged', @(src,evt) rlz.update_info());               
+                H = H + 40;
+            end
             
             % Info panel:
-            W = 300; H = 60; h = 20; % [px].
+            W = 300; h = 20; % [px].
             w = [40 80 80 80 80]; % [label edit edit edit].
-            rlz.handles.info = rlz.create_info_panel(W,H,w,h);
+            if rlz.is_valid_handle('ylines')
+                addlistener(rlz.handles.ylines(1), 'lineCreated', @(src,evt) rlz.create_info_panel(W,H,w,h)); % The #1 line will be created last.
+            else
+                addlistener(rlz.handles.xlines(1), 'lineCreated', @(src,evt) rlz.create_info_panel(W,H,w,h)); % The #1 line will be created last.
+            end
+%             addlistener(rlz.handles.xlines(1), 'lineCreated', @(src,evt) disp(src));
+%             rlz.handles.info = rlz.create_info_panel(W,H,w,h);
                         
             % Store current axis button down function:
-            rlz.cache.abdcb = get(rlz.handles.hax, 'ButtonDownFcn');
+%             rlz.cache.abdcb = get(rlz.handles.hax, 'ButtonDownFcn');
                                   
             % Set lines interaction callback:
-            rlz.interactivesOff(rlz.handles.hfig);
-            addlistener(rlz.hlines, 'positionChanged', @(src,evt) rlz.lbmcb(src,evt));
-            set(rlz.handles.hax,    'ButtonDownFcn', @(src,evt) abdcb(rlz, src, evt));
+%             rlz.interactivesOff(rlz.handles.hfig);
+%             addlistener(rlz.handles.lines, 'positionChanged', @(src,evt) rlz.lbmcb(src,evt));
+%             set(rlz.handles.hax,    'ButtonDownFcn', @(src,evt) abdcb(rlz, src, evt));
             
             % Disable hit test for images:
-            himgs = findall(rlz.handles.hax, 'type', 'Image');
-            for himg = himgs(:)'
-                himg.HitTest = 'off';
-            end
+%             himgs = findall(rlz.handles.hax, 'type', 'Image');
+%             for himg = himgs(:)'
+%                 himg.HitTest = 'off';
+%             end
         end
         
-        %% Rulerz OFF:
+        %% Rulerz OFF
         function OFF(rlz, ~, ~)
-            delete(rlz.hlines);
+            if rlz.is_valid_handle('xlines'), delete(rlz.handles.xlines); end
+            if rlz.is_valid_handle('ylines'), delete(rlz.handles.ylines); end
             delete(findall(gcf, 'tag', 'rulerzInfo'));
             
             % Restore callbacks:
             rlz.handles.hfig.SizeChangedFcn = rlz.cache.sizeChangedFcn;
-            if ishandle(rlz.handles.hax) && isvalid(rlz.handles.hax)
-                set(rlz.handles.hax, 'ButtonDownFcn', rlz.cache.abdcb);
-            end
         end
         
-        %% Interaction callbacks:        
+        %% Interaction callbacks        
         function lbmcb(rlz,src,~)
         % Line button motion callback.    
-            lix = find(rlz.hlines == src);
+            lix = find(rlz.handles.lines == src);
             switch rlz.axis
                 case {1,'x'}
-                    rlz.xx(lix) = src.Value;
+                    rlz.xx(lix) = num2ruler(src.Value, rlz.handles.hax.XAxis);
                 case {2,'y'}
-                    rlz.yy(lix) = src.Value;
+                    rlz.yy(lix) = num2ruler(src.Value, rlz.handles.hax.YAxis);
                 otherwise
                     if lix < 3
-                        rlz.xx(lix) = src.Value;
+                        rlz.xx(lix) = num2ruler(src.Value, rlz.handles.hax.XAxis);
                     else
-                        rlz.yy(lix-2) = src.Value;
+                        rlz.yy(lix-2) = num2ruler(src.Value, rlz.handles.hax.YAxis);
                     end
             end
         end
@@ -186,7 +191,7 @@ classdef iRulerz < iTool
                 cxpos = cpos(1,1); % cursor x position.
                 cypos = cpos(1,2); % cursor x position.
                 
-                xydata = [ get(rlz.hlines(rlz.lineIx), 'xdata')' get(rlz.hlines(rlz.lineIx), 'ydata')' ]; 
+                xydata = [ get(rlz.handles.lines(rlz.lineIx), 'xdata')' get(rlz.handles.lines(rlz.lineIx), 'ydata')' ]; 
                 
                 switch find(diff(xydata)==0)
                     case 1
@@ -229,24 +234,7 @@ classdef iRulerz < iTool
                          'pointer', 'fleur');
             end
         end        
-        
-        %% Info string:
-        function s = infoString(rlz)
-            switch rlz.axis
-                case {1, 'x'}
-                    s = { ['    x_1    ', '    x_2    ', '    dx    '],...
-                           sprintf('%8.2f %8.2f %8.2f', rlz.xx(1), rlz.xx(2), abs(diff(rlz.xx))) };
-                case {2, 'y'}
-                    s = {  ['    y_1    ', '    y_2    ', '    dy    '],...
-                           sprintf('%8.2f %8.2f %8.2f', rlz.yy(1), rlz.yy(2), abs(diff(rlz.yy)))};
-                otherwise
-                    s = { ['    x_1    ', '    x_2    ', '    dx    '],...
-                           sprintf('%8.2f %8.2f %8.2f', rlz.xx(1), rlz.xx(2), abs(diff(rlz.xx))),...
-                          ['    y_1    ', '    y_2    ', '    dy    '],...
-                           sprintf('%8.2f %8.2f %8.2f', rlz.yy(1), rlz.yy(2), abs(diff(rlz.yy)))};
-            end
-        end
-        
+                
         %% Listeners
         function axisChangeEvt(rlz, ~, ~)   
             % Turn off the current ruler:
@@ -266,11 +254,11 @@ classdef iRulerz < iTool
         end
         
         function xx_PostSet_cb(rlz, ~, ~)
-            if isempty(rlz.hlines) || strcmpi(rlz.axis, 'y'), return; end
+            if ~rlz.is_valid_handle('lines') || strcmpi(rlz.axis, 'y'), return; end
             
-            if isvalid(rlz.hlines(1)) && isvalid(rlz.hlines(2)) 
-                rlz.hlines(1).Value = rlz.xx(1);
-                rlz.hlines(2).Value = rlz.xx(2);
+            if isvalid(rlz.handles.lines(1)) && isvalid(rlz.handles.lines(2)) 
+                rlz.handles.lines(1).Value = rlz.xx(1);
+                rlz.handles.lines(2).Value = rlz.xx(2);
             end
             
             % Update info panel:
@@ -278,11 +266,11 @@ classdef iRulerz < iTool
         end
 
         function yy_PostSet_cb(rlz, ~, ~)
-            if isempty(rlz.hlines) || strcmpi(rlz.axis, 'x'), return; end
+            if ~rlz.is_valid_handle('lines') || strcmpi(rlz.axis, 'x'), return; end
             
             if strcmpi(rlz.axis, 'y')
                 lIx = 1;
-            elseif numel(rlz.hlines) > 2
+            elseif numel(rlz.handles.lines) > 2
                 lIx = 3;
             else
                 lIx = 0;
@@ -290,8 +278,8 @@ classdef iRulerz < iTool
             
             if lIx
                 for kk = 0:1
-                    if isvalid(rlz.hlines(lIx+kk))
-                        rlz.hlines(lIx+kk).Value = rlz.yy(kk+1);
+                    if isvalid(rlz.handles.lines(lIx+kk))
+                        rlz.handles.lines(lIx+kk).Value = rlz.yy(kk+1);
                     end
                 end
             end            
@@ -302,7 +290,7 @@ classdef iRulerz < iTool
     end
         %% Helper
     methods
-        function info = create_info_panel(rlz, W, H, w, h)
+        function create_info_panel(rlz, W, H, w, h)
         % Create an ui panel with labels and edit field in it.
         %
         % W, H - panel width and height scalar values.
@@ -316,38 +304,60 @@ classdef iRulerz < iTool
             rlz.cache.sizeChangedFcn = get(rlz.handles.hfig, 'SizeChangedFcn');
             rlz.handles.hfig.SizeChangedFcn = @(src,evt) set(rlz.handles.info.panel, 'Position', [0 src.Position(4)-H W H]);
             
-            % First row:
-            info.label(1) = uicontrol(info.panel, 'Style', 'text', 'Units', 'pixels', 'Position', [left(1) top(1) w(1) h], 'string', 'x');
-            info.text(1) = uicontrol(info.panel, 'Style', 'edit', 'Enable', 'inactive',... 
-                                                'Units', 'pixels', 'Position', [left(2) top(1) w(2) h],... 
-                                                'String', sprintf('%3.2f', rlz.xx(1)));
-            info.text(2) = uicontrol(info.panel, 'Style', 'edit', 'Enable', 'inactive',...
-                                                'Units', 'pixels', 'Position', [left(3) top(1) w(3) h],... 
-                                                'String', sprintf('%3.2f', rlz.xx(2)));
-            info.text(3) = uicontrol(info.panel, 'Style', 'edit', 'Enable', 'inactive',...
-                                                'Units', 'pixels', 'Position', [left(4) top(1) w(4) h],... 
-                                                'String', sprintf('%3.2f', range(rlz.xx)));
-            % Second row:                                
-            info.label(2) = uicontrol(info.panel, 'Style', 'text', 'Units', 'pixels', 'Position', [left(1) top(2) w(1) h], 'string', 'y');
-            info.text(4) = uicontrol(info.panel, 'Style', 'edit', 'Enable', 'inactive',... 
-                                                'Units', 'pixels', 'Position', [left(2) top(2) w(2) h],... 
-                                                'String', sprintf('%3.2f', rlz.yy(1)));
-            info.text(5) = uicontrol(info.panel, 'Style', 'edit', 'Enable', 'inactive',...
-                                                'Units', 'pixels', 'Position', [left(3) top(2) w(3) h],... 
-                                                'String', sprintf('%3.2f', rlz.yy(2)));
-            info.text(6) = uicontrol(info.panel, 'Style', 'edit', 'Enable', 'inactive',...
-                                                'Units', 'pixels', 'Position', [left(4) top(2) w(4) h],... 
-                                                'String', sprintf('%3.2f', range(rlz.yy)));            
+            ii = 1;
+            if ~isempty(intersect('x', rlz.axis))
+                info.label(ii) = uicontrol(info.panel, 'Style', 'text', 'Units', 'pixels', 'Position', [left(1) top(1) w(1) h], 'string', 'x');
+                info.text(ii,1) = uicontrol(info.panel, 'Style', 'edit', 'Enable', 'inactive',... 
+                                                    'Units', 'pixels', 'Position', [left(2) top(1) w(2) h],... 
+                                                    'String', rlz.ruler2str(rlz.xx(1)));
+                info.text(ii,2) = uicontrol(info.panel, 'Style', 'edit', 'Enable', 'inactive',...
+                                                    'Units', 'pixels', 'Position', [left(3) top(1) w(3) h],... 
+                                                    'String', rlz.ruler2str(rlz.xx(2)));
+                info.text(ii,3) = uicontrol(info.panel, 'Style', 'edit', 'Enable', 'inactive',...
+                                                    'Units', 'pixels', 'Position', [left(4) top(1) w(4) h],... 
+                                                    'String', rlz.ruler2str(range(rlz.xx)));
+                ii = ii+1;
+            end           
+            if ~isempty(intersect('y', rlz.axis))
+                info.label(ii) = uicontrol(info.panel, 'Style', 'text', 'Units', 'pixels', 'Position', [left(1) top(2) w(1) h], 'string', 'y');
+                info.text(ii,1) = uicontrol(info.panel, 'Style', 'edit', 'Enable', 'inactive',... 
+                                                    'Units', 'pixels', 'Position', [left(2) top(2) w(2) h],... 
+                                                    'String', rlz.ruler2str(rlz.yy(1)));
+                info.text(ii,2) = uicontrol(info.panel, 'Style', 'edit', 'Enable', 'inactive',...
+                                                    'Units', 'pixels', 'Position', [left(3) top(2) w(3) h],... 
+                                                    'String', rlz.ruler2str(rlz.yy(2)));
+                info.text(ii,3) = uicontrol(info.panel, 'Style', 'edit', 'Enable', 'inactive',...
+                                                    'Units', 'pixels', 'Position', [left(4) top(2) w(4) h],... 
+                                                    'String', rlz.ruler2str(range(rlz.yy)));
+            end
+            rlz.handles.info = info;
         end
         
         function update_info(rlz)
             if isfield(rlz.handles, 'info') && isfield(rlz.handles.info, 'panel') && isvalid(rlz.handles.info.panel)
-                set(rlz.handles.info.text(1), 'String', sprintf('%3.2f', rlz.xx(1)));
-                set(rlz.handles.info.text(2), 'String', sprintf('%3.2f', rlz.xx(2)));
-                set(rlz.handles.info.text(3), 'String', sprintf('%3.2f', range(rlz.xx)));
-                set(rlz.handles.info.text(4), 'String', sprintf('%3.2f', rlz.yy(1)));
-                set(rlz.handles.info.text(5), 'String', sprintf('%3.2f', rlz.yy(2)));
-                set(rlz.handles.info.text(6), 'String', sprintf('%3.2f', range(rlz.yy)));
+                ii = 1;
+                if ~isempty(intersect('x', rlz.axis))
+                    set(rlz.handles.info.text(ii,1), 'String', rlz.ruler2str(rlz.xx(1)));
+                    set(rlz.handles.info.text(ii,2), 'String', rlz.ruler2str(rlz.xx(2)));
+                    set(rlz.handles.info.text(ii,3), 'String', rlz.ruler2str(range(rlz.xx)));
+                    ii = ii+1;
+                end
+                if ~isempty(intersect('y', rlz.axis))
+                    set(rlz.handles.info.text(ii,1), 'String', rlz.ruler2str(rlz.yy(1)));
+                    set(rlz.handles.info.text(ii,2), 'String', rlz.ruler2str(rlz.yy(2)));
+                    set(rlz.handles.info.text(ii,3), 'String', rlz.ruler2str(range(rlz.yy)));
+                end
+            end
+        end
+    
+        function s = ruler2str(rlz, val)
+            s = '###';
+            if isnumeric(val)
+                s = sprintf('%5.2f', val);
+            elseif isdatetime(val)
+                s = datestr(val, 'HH:MM:SS');
+            elseif isduration(val)
+                s = datestr(val, 'MM:SS.FFF');
             end
         end
     end
