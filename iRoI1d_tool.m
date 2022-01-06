@@ -39,5 +39,9 @@ classdef iRoI1d_tool < iTool
         function add_roi(rtool,~,~)
             rtool.rois(end+1) = iRoI1d;
         end
+    
+        function rm_deleted(rtool)
+            rtool.rois = arrayfilter(@isvalid, rtool.rois);
+        end
     end
 end
