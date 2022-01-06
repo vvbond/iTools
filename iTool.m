@@ -94,7 +94,7 @@ classdef iTool < matlab.mixin.Copyable
     %% Helpers
     methods
         function tf = is_valid_handle(it, prop)
-            tf = isfield(it.handles, prop) && ~isempty(it.handles.(prop)) && isvalid(it.handles.(prop));
+            tf = isfield(it.handles, prop) && ~isempty(it.handles.(prop)) && all(isvalid(it.handles.(prop)));
         end
         
         function parse_keyvals(it, varargin)
@@ -112,6 +112,10 @@ classdef iTool < matlab.mixin.Copyable
                 it.(props{propIx}) = val;
             end
         end 
+    
+        function export_to_workspace(it)
+            export2wsdlg({'Variable name:'}, {it.tag}, {it});
+        end
     end
     %% Static
     methods(Static)
