@@ -41,12 +41,21 @@ classdef iRoI1d < iTool
     properties(SetObservable)
         alpha = .1
         color = 'b';
-%         lineStyle           % string, specifies the color and style of the vertical lines.
-%         lineColor           % color of the two side lines.
-%         lineWidth           % scalar, defines the width of the vertical lines.
-        displayFcn            % handle of the display function, returning an info string: str = f(roi).
-                              % Default: @(roi) num2str(roi.width, '%5.2f').
+        lineStyle           % string, specifies the color and style of the vertical lines.
+        lineColor           % color of the two side lines.
+        lineWidth           % scalar, defines the width of the vertical lines.
+        displayFcn          % handle of the display function, returning an info string: str = f(roi).
+                            % Default: @(roi) num2str(roi.width, '%5.2f').
 %         displayPosition    % 4-vector of [left top height width] parameters of the display box. Default: [.7 .85 .1 .1]
+    end
+
+    properties(Hidden)
+        color_hl = 'g'
+        alpha_frozen = .1
+        color_frozen = 'b'
+        lineColor_frozen
+        lineWidth_frozen = 2
+        lineStyle_frozen = ':'
     end
 
     properties(Dependent)
@@ -61,6 +70,7 @@ classdef iRoI1d < iTool
     events
         roiCreated
         roiChanged
+        roiDeleted
     end
         
     methods
@@ -74,6 +84,8 @@ classdef iRoI1d < iTool
 %             roi.displayPosition = [.65 .85 .1 .1];
             roi.tag = 'roi';
             roi.flags.roiPlotOn = false;
+            roi.flags.hl = false;
+            roi.flags.frozen = false;
             if nargin == 0
                 interval = [];
             end
@@ -93,8 +105,6 @@ classdef iRoI1d < iTool
                 roi.handles.ilines(1) = ixline(roi.handles.hax, []);
                 addlistener(roi.handles.ilines(1), 'lineCreated', @(src,evt) roi.ginput_end(src,evt));
             end
-            
-
         end
         
         %% Destructor
@@ -102,6 +112,7 @@ classdef iRoI1d < iTool
             delete(roi.handles.ilines);
             if roi.is_valid_handle('rect'), delete(roi.handles.rect); end
             if roi.is_valid_handle('infotext'), delete(roi.handles.infotext); end
+            notify(roi, 'roiDeleted');
         end
 
         %% Init
@@ -114,8 +125,9 @@ classdef iRoI1d < iTool
             roi.handles.cm = uicontextmenu;
             roi.handles.cmenu(1) = uimenu(roi.handles.cm, 'Label', 'Zoom', 'tag', 'zoom_xlim_in', 'checked', 'off', 'callback', @(src,evt) roi.zoominout(src,evt));
             roi.handles.cmenu(end+1) = uimenu(roi.handles.cm, 'Label', 'View data', 'tag', 'switch_roi_plot', 'checked', 'off', 'callback', @(src,evt) roi.switch_roi_viewdata(src,evt));
-            roi.handles.cmenu(end+1) = uimenu(roi.handles.cm, 'Label', 'Peaks Finder', 'checked', 'off', 'callback', @(src,evt) roi.roi_to_peaks_finder());
-            roi.handles.cmenu(end+1) = uimenu(roi.handles.cm, 'Label', 'Export to workspace', 'checked', 'off', 'Separator', 'on', 'callback', @(src,evt) roi.export_to_workspace());
+            roi.handles.cmenu(end+1) = uimenu(roi.handles.cm, 'Label', 'Peaks Finder', 'checked', 'off', 'callback', @(src,evt) roi.roi_peaks_finder());
+            roi.handles.cmenu(end+1) = uimenu(roi.handles.cm, 'Label', 'Freeze', 'tag', 'roi_freeze', 'checked', 'off', 'Separator', 'on', 'callback', @(src,evt) roi.freeze());
+            roi.handles.cmenu(end+1) = uimenu(roi.handles.cm, 'Label', 'Export to workspace', 'checked', 'off', 'Separator', 'off', 'callback', @(src,evt) roi.export_to_workspace());
             roi.handles.cmenu(end+1) = uimenu(roi.handles.cm, 'Label', 'Delete', 'tag', 'delete', 'checked', 'off', 'callback', @(src,evt) roi.delete());
             set(roi.handles.rect, 'UIContextMenu', roi.handles.cm);
         end
@@ -132,9 +144,18 @@ classdef iRoI1d < iTool
             addlistener(roi.handles.ilines, 'positionChanged', @(src,evt) roi.update() );
             addlistener(roi, 'color', 'PostSet', @(src,evt) roi.rect_postset_cb());
             addlistener(roi, 'alpha', 'PostSet', @(src,evt) roi.rect_postset_cb());
+            addlistener(roi, 'lineColor', 'PostSet', @(src,evt) set(roi.handles.ilines, 'color', roi.lineColor));
+            addlistener(roi, 'lineWidth', 'PostSet', @(src,evt) set(roi.handles.ilines, 'lineWidth', roi.lineWidth));
+            addlistener(roi, 'lineStyle', 'PostSet', @(src,evt) set(roi.handles.ilines, 'lineStyle', roi.lineStyle));
 
             % Context menu:
             roi.create_context_menu();
+
+            % Init line params:
+            roi.lineStyle = roi.handles.ilines(1).lineStyle;
+            roi.lineWidth = roi.handles.ilines(1).lineWidth;
+            roi.lineColor = roi.handles.ilines(1).color;
+            roi.lineColor_frozen = roi.lineColor;
 
             % Notification:
             notify(roi,'plotCreated');
@@ -158,7 +179,6 @@ classdef iRoI1d < iTool
 
         % button down callback
         function rect_bdcb(roi,~,evt)
-            
             if evt.Button ~= 1, return; end
             dx = roi.interval_num(1) - roi.currentPoint(1);
             roi.store_window_callbacks();
@@ -178,7 +198,7 @@ classdef iRoI1d < iTool
         function wbucb(roi,~,~)
             roi.restore_window_callbacks();
             notify(roi, 'buttonUp');
-        end        
+        end
         
         %% ROI update
         function update(roi)
@@ -190,9 +210,23 @@ classdef iRoI1d < iTool
             notify(roi, 'roiChanged');
         end
         
-        %% Annotation
+        %% Annotation & Appeal
         function display_info(roi)
             roi.handles.infotext = text(roi.vertices(2,1), roi.vertices(2,2), roi.displayFcn(roi), 'FontSize', 16);
+        end
+        
+        function highlight(roi, clr)
+            if nargin == 1, clr = roi.color_hl; end
+            if nargin == 2
+                if islogical(clr) && clr == false
+                    roi.color = roi.cache.color;
+                    roi.flags.hl = false;
+                    return
+                end
+            end
+            if ~roi.flags.hl, roi.cache.color = roi.color; end
+            roi.color = clr;
+            roi.flags.hl = true;
         end
     end
 
@@ -224,9 +258,14 @@ classdef iRoI1d < iTool
             end
         end
     
-        function roi_to_peaks_finder(roi)
-            roi.handles.peaksFinder = iPeaksFinder(roi.data.y, roi.data.x);
-            roi.handles.peaksFinder.handles.Parent = roi;
+        function roi_peaks_finder(roi)
+            if roi.is_valid_handle('peaksFinder') && roi.handles.peaksFinder.flags.done
+                roi.handles.peaksFinder.init_plot();
+            else
+                roi.handles.peaksFinder = iPeaksFinder(roi.data.y, roi.data.x);
+                roi.handles.peaksFinder.handles.Parent = roi;
+                addlistener(roi, 'roiChanged', @(src,evt) roi.handles.peaksFinder.invalidate());
+            end
         end
     end
 
@@ -283,6 +322,34 @@ classdef iRoI1d < iTool
                 xlim(roi.handles.hax, interval_resize(roi.interval, 1.1));
             else
                 xlim(roi.handles.hax, roi.cache.xlims);
+            end
+        end
+
+        function freeze(roi, force)
+            if nargin == 1, force = false; end
+            cmitem = findall(roi.handles.cmenu, 'tag', 'roi_freeze');
+            if cmitem.Checked == "on" && force, return; end
+            cmitem.Checked = ifthel(cmitem.Checked == "on", "off", "on");
+            if cmitem.Checked == "on" 
+                set(roi.handles.rect, 'ButtonDownFcn', []);
+                roi.handles.ilines(1).freeze();
+                roi.handles.ilines(2).freeze();
+                % Store lines properties:
+                roi.cache.lineWidth = roi.lineWidth;
+                roi.cache.lineColor = roi.lineColor;
+                roi.cache.lineStyle = roi.lineStyle;
+                % Change line appearance to indicate the frozen status:
+                roi.lineStyle = roi.lineStyle_frozen;
+                roi.lineWidth = roi.lineWidth_frozen;
+                roi.flags.frozen = true;
+            else
+                set(roi.handles.rect, 'ButtonDownFcn', @(src,evt) roi.rect_bdcb(src,evt));
+                roi.handles.ilines(1).freeze();
+                roi.handles.ilines(2).freeze();
+                % Restore the previous line appearance:
+                roi.lineWidth = roi.cache.lineWidth;
+                roi.lineStyle = roi.cache.lineStyle;
+                roi.flags.frozen = false;
             end
         end
 
