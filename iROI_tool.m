@@ -1,31 +1,32 @@
-classdef iRoI1d_tool < iTool
-% Push button to add a iRoI1d interactively to the current axes.
+classdef iROI_tool < iTool
+% Push button to add a iROI interactively to the current axes.
 %
 % Usage
 % =====
-%  iRoI1d_tool
+%  iROI_tool
 %
 % The command adds a pushbutton to the toolbar of the current figure.
-% Click the button to define a iRoI1d interactively by click-and-dragging in the current axes.
+% Click the button to define a iROI interactively by click-and-dragging in the current axes.
 %
 % Properties
 % ==========
-%  rois     - an array of iRoI1d added to the current figure.
+%  rois     - an array of iROI(s) added to the current figure.
 %
 % Example
 % =======
-%  figure, plot(cumsum(rand(1000,1)*2-1)), iRoI1d_tool
+%  figure, plot(cumsum(rand(1000,1)*2-1)), iROI_tool
 %
-% See also: iRoI1d.
+% See also: iROI.
 
 % 31-Dec-2021
 % (c) Vladimir Bondarenko, http://www.mathworks.co.uk/matlabcentral/fileexchange/authors/52876
 
     properties
-        rois = iRoI1d.empty()
+        rois = iROI.empty()
     end
     methods
-        function rtool = iRoI1d_tool()
+        function rtool = iROI_tool()
+            rtool.tag = 'iROI_tool';
             % Create toggle button:
             rtool.handles.tbar = findall(gcf,'Type','uitoolbar');
             roi1Icon_fname = 'roi1Icon.mat';
@@ -37,14 +38,14 @@ classdef iRoI1d_tool < iTool
         end
 
         function add_roi(rtool,~,~)
-            rtool.rois(end+1) = iRoI1d;
+            rtool.rois(end+1) = iROI;
             addlistener(rtool.rois(end), 'roiDeleted', @(src,evt) rtool.rm_deleted());
         end
     
         function rm_deleted(rtool)
             rtool.rois = arrayfilter(@isvalid, rtool.rois);
             if isempty(rtool.rois)
-                rtool.rois = iRoI1d.empty();
+                rtool.rois = iROI.empty();
             end
         end
     end

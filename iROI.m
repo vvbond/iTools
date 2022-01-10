@@ -1,12 +1,12 @@
-classdef iRoI1d < iTool
+classdef iROI < iTool
 % Interactive tool for specifying a 1D region of interest (ROI).
 %
 % Usage
 % =====
-%  iRoI1d                   
-%  roi = iRoI1d             
-%  roi = iRoI1d(interval)   
-%  roi = iRoI1d(hax, interval)
+%  iROI
+%  roi = iROI
+%  roi = iROI(interval)   
+%  roi = iROI(hax, interval)
 % 
 % Input
 % =====
@@ -31,9 +31,9 @@ classdef iRoI1d < iTool
 %
 % Example
 % =======
-% figure, plot(cumsum(rand(1000,1)*2-1)), roi = iRoI1d([200 600])
+% figure, plot(cumsum(rand(1000,1)*2-1)), roi = iROI([200 600])
 %
-% See also: iPoint, iLineSegment, iRectangle, iRectROI, iPeaksFinder.
+% See also: iROI_tool, iPoint, iLineSegment, iRectangle, iRectROI, iPeaksFinder.
 
 % (c) Vladimir Bondarenko, http://www.mathworks.co.uk/matlabcentral/fileexchange/authors/52876
     
@@ -75,7 +75,7 @@ classdef iRoI1d < iTool
         
     methods
         %% Constructor
-        function roi = iRoI1d(interval)
+        function roi = iROI(interval)
             
             % Defaults:
 %             roi.lineStyle = '-';
@@ -251,7 +251,7 @@ classdef iRoI1d < iTool
                 iAxes.set_keyboard_shortcuts(hfig);
                 iAxes.set_interactions(roi.handles.roiview_hax);
                 roi.handles.roiview_rlz     = iRulerz('x');
-                roi.handles.roiview_roitool = iRoI1d_tool;
+                roi.handles.roiview_roitool = iROI_tool;
             else
                 set(roi.handles.roiview_plot, 'XData', roi.data.x, 'YData', roi.data.y);
                 title(roi.handles.roiview_hax, sprintf('ROI: %s', range(roi.interval)), roi.interval);

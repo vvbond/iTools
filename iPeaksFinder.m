@@ -97,7 +97,7 @@ classdef iPeaksFinder < iTool
             pkf.create_main_menu();
 
             % Toolbar:
-            pkf.handles.roitool = iRoI1d_tool;
+            pkf.handles.roitool = iROI_tool;
             pkf.handles.rlz = iRulerz('x');
 
             % Buttons:
@@ -174,7 +174,7 @@ classdef iPeaksFinder < iTool
 
         function done_cb(pkf)
             pkf.flags.done = true;
-            if pkf.is_valid_handle('Parent') && isa(pkf.handles.Parent, 'iRoI1d')
+            if pkf.is_valid_handle('Parent') && isa(pkf.handles.Parent, 'iROI')
                 pkf.handles.Parent.highlight();
                 pkf.handles.Parent.freeze(true);
             end
@@ -183,7 +183,7 @@ classdef iPeaksFinder < iTool
 
         function invalidate(pkf)
             pkf.flags.done = false;
-            if pkf.is_valid_handle('Parent') && isa(pkf.handles.Parent, 'iRoI1d')
+            if pkf.is_valid_handle('Parent') && isa(pkf.handles.Parent, 'iROI')
                 pkf.handles.Parent.highlight(false);
             end
         end
