@@ -38,10 +38,14 @@ classdef iRoI1d_tool < iTool
 
         function add_roi(rtool,~,~)
             rtool.rois(end+1) = iRoI1d;
+            addlistener(rtool.rois(end), 'roiDeleted', @(src,evt) rtool.rm_deleted());
         end
     
         function rm_deleted(rtool)
             rtool.rois = arrayfilter(@isvalid, rtool.rois);
+            if isempty(rtool.rois)
+                rtool.rois = iRoI1d.empty();
+            end
         end
     end
 end
