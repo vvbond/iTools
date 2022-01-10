@@ -14,6 +14,9 @@ classdef iAxisLine < iTool
     properties(SetObservable)
        Value
        Label
+       color
+       lineWidth
+       lineStyle
     end
     properties(Hidden)
         dim
@@ -26,6 +29,7 @@ classdef iAxisLine < iTool
     end
     events
         lineCreated
+        lineDeleted
     end
     methods
         function ial = iAxisLine(varargin)
@@ -62,7 +66,11 @@ classdef iAxisLine < iTool
             % Init:
             ial.dim = dim;
             ial.keyvals = keyvals;
+            ial.flags.freeze = false;
             addlistener(ial, 'Value', 'PostSet', @ial.set_value_cb);
+            addlistener(ial, 'color', 'PostSet', @(src,evt) set(ial.handles.iline, 'Color', ial.color));
+            addlistener(ial, 'lineWidth', 'PostSet', @(src,evt) set(ial.handles.iline, 'LineWidth', ial.lineWidth));
+            addlistener(ial, 'lineStyle', 'PostSet', @(src,evt) set(ial.handles.iline, 'LineStyle', ial.lineStyle));
 
             % If val is empty, specify it interactively:
             if isempty(val)
@@ -74,13 +82,12 @@ classdef iAxisLine < iTool
         
         function delete(ial)
             if isfield(ial.handles, 'iline'), delete(ial.handles.iline); end
-            if isfield(ial.handles, 'linkListener')
-                delete(ial.handles.linkListener);
-            end
+            if isfield(ial.handles, 'linkListener'), delete(ial.handles.linkListener); end
             % Restore axes settings:
             if ishandle(ial.handles.hax) && isvalid(ial.handles.hax)
                 ial.handles.hax.PickableParts = ial.cache.axesPickableParts;
             end
+            notify(ial, 'lineDeleted');
         end
         
         function init(ial, val)
@@ -105,6 +112,9 @@ classdef iAxisLine < iTool
                     error('iAxisLine: unknown axis parameter %s', ial.dim);
             end
             ial.Label = ial.value_to_string(ial.Value);
+            ial.color = ial.handles.iline.Color;
+            ial.lineWidth = ial.handles.iline.LineWidth;
+            ial.lineStyle = ial.handles.iline.LineStyle;
 
             % Activate the axis:
             ial.cache.axesPickableParts = ial.handles.hax.PickableParts;
@@ -216,10 +226,25 @@ classdef iAxisLine < iTool
             end            
         end
         
-        function whoami(ial)
-            class(ial)
+        function freeze(ial)
+            ial.flags.freeze = ~ial.flags.freeze;
+            if ial.flags.freeze
+                set(ial.handles.iline, 'ButtonDownFcn', []);
+            else
+                set(ial.handles.iline, 'ButtonDownFcn', @ial.bdcb);
+            end
         end
-
+        
+        %% Getters
+        function val = get.xlims(ial)
+            val = ial.handles.hax.XAxis.Limits;
+        end
+        
+        function val = get.ylims(ial)
+            val = ial.handles.hax.YAxis.Limits;
+        end
+    
+        %% Helpers
         function s = value_to_string(ial, val, precision)
             narginchk(2,3);
             if ial.dim == 1
@@ -240,14 +265,10 @@ classdef iAxisLine < iTool
                 s = datestr(val, precision);
             end    
         end
-
-        %% Getters
-        function val = get.xlims(ial)
-            val = ial.handles.hax.XAxis.Limits;
-        end
         
-        function val = get.ylims(ial)
-            val = ial.handles.hax.YAxis.Limits;
+        function whoami(ial)
+            class(ial)
         end
+
     end
 end
