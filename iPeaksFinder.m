@@ -16,6 +16,7 @@ classdef iPeaksFinder < iTool
         function pkf = iPeaksFinder(data, x)
             narginchk(1,2);
             pkf.tag = 'pkf';
+            pkf.flags.done = false;
             if nargin == 1
                 x = 1:length(data);
             end
@@ -55,7 +56,7 @@ classdef iPeaksFinder < iTool
         function create_main_menu(pkf)
             pkf.handles.menu = uimenu(pkf.handles.hfig, 'Text', 'Peaks Finder');
             pkf.handles.menu_params = uimenu(pkf.handles.menu, 'Text', 'Params', 'MenuSelectedFcn', @(src,evt) pkf.menu_params_cb());
-            pkf.handles.menu_freqs  = uimenu(pkf.handles.menu, 'Text', 'Estimate peaks frequency', 'MenuSelectedFcn', @(src,evt) pkf.menu_freqs_cb());
+%             pkf.handles.menu_freqs  = uimenu(pkf.handles.menu, 'Text', 'Estimate peaks frequency', 'MenuSelectedFcn', @(src,evt) pkf.menu_freqs_cb());
             pkf.handles.menu_export = uimenu(pkf.handles.menu, 'Text', 'Export to workspace', 'Separator', 'on', 'MenuSelectedFcn', @(src,evt) pkf.export_to_workspace());
         end
 
@@ -174,9 +175,17 @@ classdef iPeaksFinder < iTool
         function done_cb(pkf)
             pkf.flags.done = true;
             if pkf.is_valid_handle('Parent') && isa(pkf.handles.Parent, 'iRoI1d')
-                pkf.handles.Parent.color = 'g';
+                pkf.handles.Parent.highlight();
+                pkf.handles.Parent.freeze(true);
             end
             close(pkf.handles.hfig);
+        end
+
+        function invalidate(pkf)
+            pkf.flags.done = false;
+            if pkf.is_valid_handle('Parent') && isa(pkf.handles.Parent, 'iRoI1d')
+                pkf.handles.Parent.highlight(false);
+            end
         end
     end
     events
