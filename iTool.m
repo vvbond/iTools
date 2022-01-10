@@ -98,7 +98,6 @@ classdef iTool < matlab.mixin.Copyable
         end
         
         function parse_keyvals(it, varargin)
-
             if mod(length(varargin),2), error('%s: Number of key-value arguments must be even.', class(it)); end
             props = properties(it);
             for ii=1:2:length(varargin)
