@@ -32,21 +32,32 @@ classdef iROI_tool < iTool
             roi1Icon_fname = 'roi1Icon.mat';
             roi1Icon = load(fullfile(fileparts(mfilename('fullpath')), 'icons', roi1Icon_fname));
             rtool.handles.btn = uipushtool(rtool.handles.tbar,  'CData', roi1Icon.cdata, ...
-                                                    'ClickedCallback',  @(src,evt) add_roi(rtool,src,evt),...
+                                                    'ClickedCallback',  @(src,evt) add_roi_cb(rtool,src,evt),...
                                                     'tooltipstring', 'RoI 1D',...
                                                     'Separator', 'on');
         end
 
-        function add_roi(rtool,~,~)
-            rtool.rois(end+1) = iROI;
-            addlistener(rtool.rois(end), 'roiDeleted', @(src,evt) rtool.rm_deleted());
+        function add_roi_cb(rtool, ~, ~)
+            rtool.add_roi();
+        end
+
+        function add_roi(rtool, roi)
+            if nargin == 1, roi = iROI; end
+            rtool.rois(end+1) = roi;
+            addlistener(rtool.rois(end), 'roiDeleted', @(src,evt) rtool.cleanup());
         end
     
-        function rm_deleted(rtool)
+        function cleanup(rtool)
             rtool.rois = arrayfilter(@isvalid, rtool.rois);
             if isempty(rtool.rois)
                 rtool.rois = iROI.empty();
             end
+        end
+    
+        function delete_roi(rtool, ix)
+            if nargin == 1, ix = 1:length(rtool.rois); end
+            delete(rtool.rois(ix));
+            rtool.cleanup();
         end
     end
 end
