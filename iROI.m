@@ -183,8 +183,8 @@ classdef iROI < iTool
             dx = roi.interval_num(1) - roi.currentPoint(1);
             roi.store_window_callbacks();
             set(roi.handles.hfig, 'windowButtonMotionFcn', @(src,evt) wbmcb(roi,src,evt, dx),...
-                                'windowButtonUpFcn',     @(src,evt) wbucb(roi,src,evt),...
-                                'pointer', 'left');
+                                  'windowButtonUpFcn',     @(src,evt) wbucb(roi,src,evt),...
+                                  'pointer', 'left');
         end
                 
         % window button motion callback
@@ -217,11 +217,17 @@ classdef iROI < iTool
         
         function highlight(roi, clr)
             if nargin == 1, clr = roi.color_hl; end
-            if nargin == 2
-                if islogical(clr) && clr == false
-                    roi.color = roi.cache.color;
-                    roi.flags.hl = false;
-                    return
+            if islogical(clr)
+                if clr == false 
+                    if roi.flags.hl
+                        roi.color = roi.cache.color;
+                        roi.flags.hl = false;
+                        return
+                    else
+                        return
+                    end
+                else
+                    clr = roi.color_hl;
                 end
             end
             if ~roi.flags.hl, roi.cache.color = roi.color; end
@@ -299,7 +305,7 @@ classdef iROI < iTool
                 return;
             end
             ind  = roi.within(l(1).XData);
-            data = struct('x', l.XData(ind), 'y', l.YData(ind));
+            data = struct('x', vec(l.XData(ind)), 'y', vec(l.YData(ind)));
         end
     
     end
