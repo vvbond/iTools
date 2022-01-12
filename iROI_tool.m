@@ -25,16 +25,28 @@ classdef iROI_tool < iTool
         rois = iROI.empty()
     end
     methods
-        function rtool = iROI_tool()
-            rtool.tag = 'iROI_tool';
+        function rtool = iROI_tool(hfig)
+            if nargin == 0, hfig = gcf; end
+            tag = 'iROI_tool';
+            rtool = rtool@iTool(tag, hfig);
+            % Quit if the button already there:
+            if ~isempty(rtool.handles.hButton), return; end
+
             % Create toggle button:
             rtool.handles.tbar = findall(gcf,'Type','uitoolbar');
             roi1Icon_fname = 'roi1Icon.mat';
             roi1Icon = load(fullfile(fileparts(mfilename('fullpath')), 'icons', roi1Icon_fname));
-            rtool.handles.btn = uipushtool(rtool.handles.tbar,  'CData', roi1Icon.cdata, ...
-                                                    'ClickedCallback',  @(src,evt) add_roi_cb(rtool,src,evt),...
-                                                    'tooltipstring', 'RoI 1D',...
-                                                    'Separator', 'on');
+            rtool.handles.hButton = uipushtool(rtool.handles.tbar,  'CData', roi1Icon.cdata, ...
+                                                                'ClickedCallback',  @(src,evt) add_roi_cb(rtool,src,evt),...
+                                                                'tooltipstring', '1-d ROI',...
+                                                                'tag', rtool.tag,...
+                                                                'UserData', rtool,...
+                                                                'Separator', 'on');
+        end
+
+        function delete(rtool)
+            rtool.delete_roi();
+            delete(rtool.handles.hButton);
         end
 
         function add_roi_cb(rtool, ~, ~)
