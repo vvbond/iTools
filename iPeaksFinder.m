@@ -3,6 +3,8 @@ classdef iPeaksFinder < iTool
         peaks
         data
         x
+    end
+    properties(SetObservable)
         minheight
         minprominence
         mindistance
@@ -12,37 +14,47 @@ classdef iPeaksFinder < iTool
         prominence_factor = .5;
         distance_factor = .7;
     end
+    properties(Dependent)
+        sign
+    end
     methods
         function pkf = iPeaksFinder(data, x)
             narginchk(1,2);
+            % Defaults:
             pkf.tag = 'pkf';
             pkf.flags.done = false;
-            if nargin == 1
-                x = 1:length(data);
-            end
+            pkf.flags.isinverted = true;
+            if nargin == 1, x = 1:length(data); end
             pkf.data = data;
             pkf.x = x;
-            pkf.minheight = max(data)*pkf.height_factor;
-            pkf.minprominence = range(data)*pkf.prominence_factor;
+
+            % Initial peaks detection pass:
             pkf.init_params();
+
+            % Main peaks detection:
             pkf.find_peaks();
+
+            % Plot initialization:
             pkf.init_plot();
         end
 
         %% Compute
         function init_params(pkf)
-            [pks, locs, wdth, prom] = findpeaks(pkf.data, pkf.x);
-            pkf.minheight = pkf.height_factor * median(pks);
+            [pks, locs, wdth, prom] = findpeaks(pkf.sign*pkf.data, pkf.x);
+            pkf.minheight = pkf.sign * pkf.height_factor * median(pks);
             pkf.minprominence = pkf.prominence_factor * median(prom);
             pkf.mindistance = pkf.distance_factor * median(diff(locs));
         end
 
         function find_peaks(pkf)
-            [pks, locs, wdth, prom] = findpeaks(pkf.data, pkf.x, ...
-                                    'MinPeakHeight', pkf.minheight, ...
+            [pks, locs, wdth, prom] = findpeaks(pkf.sign*pkf.data, pkf.x, ...
+                                    'MinPeakHeight', pkf.sign*pkf.minheight, ...
                                     'MinPeakProminence', pkf.minprominence, ...
                                     'MinPeakDistance',pkf.mindistance);
-            pkf.peaks = struct('value', pks, 'location', locs, 'width', wdth, 'prominence', prom);
+            pkf.peaks = struct('value', pkf.sign*pks, ...
+                               'location', locs, ...
+                               'width', wdth, ...
+                               'prominence', prom);
         end
 
         function delete_peak(pkf, ix)
@@ -91,6 +103,7 @@ classdef iPeaksFinder < iTool
             addlistener(pkf.handles.height_line, 'buttonUp', @(src,evt) pkf.update());
             addlistener(pkf.handles.prominence_line, 'positionChanged', @(src,evt) pkf.set('minprominence', pkf.handles.prominence_line.Value));
             addlistener(pkf.handles.prominence_line, 'buttonUp', @(src,evt) pkf.update());
+            addlistener(pkf, 'minheight', 'PostSet', @(src,evt) pkf.minheight_PostSet_cb());
             iAxes.set_keyboard_shortcuts(pkf.handles.hfig);
 
             % Menus:
@@ -108,6 +121,13 @@ classdef iPeaksFinder < iTool
                                              'FontSize', 14, ...
                                              'BackgroundColor', 'g', ...
                                              'Callback', @(src,evt) pkf.done_cb());
+            % Troughs detection switch:
+            corner_posiion = [ pkf.handles.hax.Position*[1 0; 0 1; 1 0; 0 1], .1, .1 ];
+            pkf.handles.chkbox_invert = uicontrol(pkf.handles.hfig, "Style","checkbox", ...
+                                           "String", "Troughs detection", ...
+                                           "Units", "normalized", ...
+                                           "Position", corner_posiion, ...
+                                           "Value", pkf.flags.isinverted, "Callback", @(src,evt) pkf.invert_cb(src) );
         end
 
         function update(pkf, recompute)
@@ -135,7 +155,7 @@ classdef iPeaksFinder < iTool
             if evt.Button ~= 3, return; end
             p = evt.IntersectionPoint;
             location_num = ruler2num(pkf.peaks.location, pkf.handles.hax.XAxis);
-            ix = find(abs(location_num - p(1)) < 1e-8);
+            ix = find(abs(location_num - p(1)) < 1e-7);
             pkf.delete_peak(ix);
             pkf.update(false);
         end
@@ -165,13 +185,6 @@ classdef iPeaksFinder < iTool
             pkf.update();
         end
 
-        function menu_freqs_cb(pkf)
-            prompt = {'Resolution'};
-            dlgtitle = 'Peaks frequency';
-            dims = [1, 20];
-            definput = num2str(30);
-        end
-
         function done_cb(pkf)
             pkf.flags.done = true;
             if pkf.is_valid_handle('Parent') && isa(pkf.handles.Parent, 'iROI')
@@ -187,7 +200,23 @@ classdef iPeaksFinder < iTool
                 pkf.handles.Parent.highlight(false);
             end
         end
+    
+        function invert_cb(pkf, src)
+            pkf.flags.isinverted = src.Value;
+            pkf.minheight = pkf.sign * abs(pkf.minheight);
+            pkf.update();
+        end
+    
+        function minheight_PostSet_cb(pkf)
+            if pkf.is_valid_handle('height_line')
+                pkf.handles.height_line.Value = pkf.sign*abs(pkf.minheight);
+            end
+        end
     end
-    events
+    %% Setters & Getters
+    methods
+        function val = get.sign(pkf)
+            val = ifthel(pkf.flags.isinverted, -1, 1);
+        end
     end
 end
