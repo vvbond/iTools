@@ -23,7 +23,7 @@ classdef iPeaksFinder < iTool
             % Defaults:
             pkf.tag = 'pkf';
             pkf.flags.done = false;
-            pkf.flags.isinverted = true;
+            pkf.flags.isinverted = false;
             if nargin == 1, x = 1:length(data); end
             pkf.data = data;
             pkf.x = x;
